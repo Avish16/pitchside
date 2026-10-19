@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AnswerMode, DesktopSettings, SharePreview, Snapshot } from '@pitchside/shared'
+import { isLikelyQuestion, type AnswerMode, type DesktopSettings, type SharePreview, type Snapshot } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
 import { CallSection } from '../call/CallSection'
+import { askGrounded } from '../ground'
+import { KnowledgeSection } from '../knowledge/KnowledgeSection'
 
 const empty: Snapshot = {
   backend: 'unknown',
@@ -67,7 +69,7 @@ export function PanelApp() {
     }
     setAskError('')
     setAsking(true)
-    const result = await bridge.ask({ question: trimmed, mode })
+    const result = await askGrounded(bridge, trimmed, mode)
     if (!result.ok) {
       setAsking(false)
       setAskError(result.error)
@@ -106,7 +108,12 @@ export function PanelApp() {
           </button>
         </header>
 
-        <CallSection bridge={bridge} />
+        <CallSection
+          bridge={bridge}
+          onClientFinal={(text) => {
+            if (isLikelyQuestion(text)) void submit('fast', text)
+          }}
+        />
 
         <section className="card">
           <h2>Question</h2>
@@ -141,6 +148,8 @@ export function PanelApp() {
           </p>
           {cards[0] ? <AnswerView card={cards[0]} /> : <p className="fine">No answer yet. The offline demo still streams a labeled reply.</p>}
         </section>
+
+        <KnowledgeSection bridge={bridge} />
 
         <section className="card">
           <div className="row">

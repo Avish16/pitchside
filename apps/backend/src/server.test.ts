@@ -51,12 +51,18 @@ describe('backend routes', () => {
       method: 'POST',
       url: '/v1/answers',
       headers: { authorization: 'Bearer pitchside-dev' },
-      payload: { question: 'What is the seat price?', mode: 'fast', context: 'Seat price is $40.' },
+      payload: {
+        question: 'What is the seat price?',
+        mode: 'fast',
+        context: 'Seat price is $40.',
+        notes: '[Seat pricing] $40 a month',
+      },
     })
     expect(response.statusCode).toBe(200)
     expect(response.body).toContain('Quote the list price')
     expect(response.body).toContain('"provider":"fake"')
     expect(model.last?.cachedContext).toBe('Seat price is $40.')
+    expect(model.last?.messages[0]?.content).toContain('[Seat pricing]')
     expect(model.last?.model).toBe('claude-haiku-5-5')
     expect(model.last?.effort).toBe('low')
     await app.close()

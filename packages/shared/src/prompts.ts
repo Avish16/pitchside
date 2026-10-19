@@ -5,8 +5,11 @@ If the context does not cover something, say what to confirm before answering.
 No greeting and no closing offer. These are cues, not a script to read aloud.
 This is a business conversation.`
 
-export function answerUserPrompt(input: { question: string; transcript?: string }): string {
+export function answerUserPrompt(input: { question: string; transcript?: string; notes?: string }): string {
   const lines = [`Question: ${input.question.trim()}`]
+  if (input.notes?.trim()) {
+    lines.push('', 'Retrieved notes. Prefer these when they answer the question:', input.notes.trim())
+  }
   if (input.transcript?.trim()) {
     lines.push('', 'Recent transcript:', input.transcript.trim())
   }

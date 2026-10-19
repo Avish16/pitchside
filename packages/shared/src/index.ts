@@ -28,7 +28,7 @@ export interface SharePreview {
 export type AnswerMode = 'fast' | 'deep'
 
 export type AnswerEvent =
-  | { type: 'start'; id: string; question: string; mode: AnswerMode }
+  | { type: 'start'; id: string; question: string; mode: AnswerMode; citations?: Citation[] }
   | { type: 'delta'; id: string; text: string }
   | { type: 'done'; id: string; provider: string }
   | { type: 'error'; id: string; message: string }
@@ -48,7 +48,9 @@ export interface AskRequest {
   question: string
   mode: AnswerMode
   context?: string
+  notes?: string
   transcript?: string
+  citations?: Citation[]
 }
 
 export { LIVE_SYSTEM_PROMPT, answerUserPrompt } from './prompts'
@@ -64,7 +66,22 @@ export {
   shouldKeepAlive,
   stereoFrame,
 } from './audio'
+import type { Citation, KnowledgeHit, KnowledgeKind, KnowledgeSource } from './knowledge'
 import type { TranscriptLine } from './transcript'
+
+export type { Citation, IndexedChunk, KnowledgeDoc, KnowledgeHit, KnowledgeKind, KnowledgeSource } from './knowledge'
+export {
+  chunkText,
+  cosine,
+  embed,
+  formatKnowledge,
+  formatRetrieved,
+  htmlToText,
+  indexDocuments,
+  isLikelyQuestion,
+  searchChunks,
+  tokenize,
+} from './knowledge'
 
 export { reduceTranscript, speakerLabel } from './transcript'
 export type { Speaker, TranscriptEvent, TranscriptLine } from './transcript'
@@ -92,6 +109,18 @@ export interface PitchsideBridge {
   publishTranscript: (lines: TranscriptLine[]) => Promise<void>
   getTranscript: () => Promise<TranscriptLine[]>
   ask: (input: AskRequest) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
+  listKnowledge: () => Promise<KnowledgeSource[]>
+  addKnowledge: (input: {
+    title: string
+    text: string
+    kind: KnowledgeKind
+    triggers?: string[]
+  }) => Promise<{ ok: true; source: KnowledgeSource } | { ok: false; error: string }>
+  addKnowledgeUrl: (url: string) => Promise<{ ok: true; source: KnowledgeSource } | { ok: false; error: string }>
+  openKnowledgeFile: () => Promise<{ ok: true; source: KnowledgeSource } | { ok: false; error: string }>
+  removeKnowledge: (id: string) => Promise<KnowledgeSource[]>
+  searchKnowledge: (query: string) => Promise<KnowledgeHit[]>
+  knowledgeContext: () => Promise<string>
   onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void
   onAskFocus: (listener: () => void) => () => void
   onDeepAsk: (listener: () => void) => () => void

@@ -1,4 +1,4 @@
-import type { AnswerEvent, AnswerMode } from '@pitchside/shared'
+import type { AnswerEvent, AnswerMode, Citation } from '@pitchside/shared'
 
 export interface AnswerCard {
   id: string
@@ -8,6 +8,7 @@ export interface AnswerCard {
   provider: string
   status: 'streaming' | 'done' | 'error'
   error: string
+  citations: Citation[]
 }
 
 export function applyAnswerEvent(cards: AnswerCard[], event: AnswerEvent): AnswerCard[] {
@@ -20,6 +21,7 @@ export function applyAnswerEvent(cards: AnswerCard[], event: AnswerEvent): Answe
       provider: '',
       status: 'streaming',
       error: '',
+      citations: event.citations ?? [],
     }
     return [started, ...cards].slice(0, 6)
   }

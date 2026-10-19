@@ -43,11 +43,12 @@ export function buildServer(deps: ServerDeps = defaultDeps()): FastifyInstance {
     }
   })
 
-  app.post('/v1/warmup', async () => {
+  app.post<{ Body: { context?: string } }>('/v1/warmup', async (request) => {
+    const cachedContext = request.body?.context?.trim() || 'Pitchside knowledge cache.'
     const iterator = deps.model.stream({
       model: deps.config.fastModel,
       system: LIVE_SYSTEM_PROMPT,
-      cachedContext: 'Pitchside knowledge cache.',
+      cachedContext,
       messages: [{ role: 'user', content: 'ping' }],
       maxTokens: 16,
       effort: 'low',
@@ -58,7 +59,7 @@ export function buildServer(deps: ServerDeps = defaultDeps()): FastifyInstance {
     return { ok: true, provider: deps.model.provider }
   })
 
-  app.post<{ Body: { question?: string; mode?: string; context?: string; transcript?: string } }>(
+  app.post<{ Body: { question?: string; mode?: string; context?: string; notes?: string; transcript?: string } }>(
     '/v1/answers',
     async (request, reply) => {
       const question = request.body?.question?.trim() ?? ''
@@ -75,7 +76,16 @@ export function buildServer(deps: ServerDeps = defaultDeps()): FastifyInstance {
               model: modelId,
               system: LIVE_SYSTEM_PROMPT,
               cachedContext: request.body?.context,
-              messages: [{ role: 'user', content: answerUserPrompt({ question, transcript: request.body?.transcript }) }],
+              messages: [
+                {
+                  role: 'user',
+                  content: answerUserPrompt({
+                    question,
+                    transcript: request.body?.transcript,
+                    notes: request.body?.notes,
+                  }),
+                },
+              ],
               maxTokens: mode === 'deep' ? 900 : 320,
               effort: mode === 'deep' ? 'high' : 'low',
               signal: abort.signal,

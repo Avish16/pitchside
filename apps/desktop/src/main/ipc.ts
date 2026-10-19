@@ -1,9 +1,19 @@
-import { app, ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import type { AnswerEvent, AskRequest, DesktopSettings, SharePreview, Snapshot, TranscriptLine } from '@pitchside/shared'
+import type {
+  AnswerEvent,
+  AskRequest,
+  Citation,
+  DesktopSettings,
+  KnowledgeKind,
+  SharePreview,
+  Snapshot,
+  TranscriptLine,
+} from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 import { streamBackendAnswer } from './answers'
+import { KnowledgeStore, readNoteFile, readUrl } from './knowledge'
 import { prepareCall } from './call'
 import { BACKEND_URL, readBackendHealth } from './health'
 import { hotkeyLabels } from './privacy'
@@ -98,6 +108,26 @@ export function registerIpc(
     backendUrl: BACKEND_URL,
   })
 
+  let knowledge: KnowledgeStore | null = null
+  const knowledgeStore = (): KnowledgeStore => {
+    if (!knowledge) knowledge = new KnowledgeStore(join(app.getPath('userData'), 'knowledge.json'))
+    return knowledge
+  }
+  const warmKnowledge = (): void => {
+    const settings = currentSettings()
+    const context = knowledgeStore().context()
+    void fetch(`${settings.backendUrl}/v1/warmup`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${settings.devToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ context }),
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => undefined)
+  }
+  warmKnowledge()
+
   ipcMain.handle(Ipc.getSnapshot, () => snapshot())
   ipcMain.handle(Ipc.refreshHealth, () => snapshot())
   ipcMain.handle(Ipc.showOverlay, async () => {
@@ -149,7 +179,8 @@ export function registerIpc(
     if (!question) return { ok: false as const, error: 'Type a question first.' }
     const id = randomUUID()
     const settings = currentSettings()
-    broadcastAnswer({ type: 'start', id, question, mode })
+    const citations = cleanCitations(input.citations)
+    broadcastAnswer({ type: 'start', id, question, mode, citations })
     void streamBackendAnswer({
       backendUrl: settings.backendUrl,
       devToken: settings.devToken,
@@ -157,6 +188,7 @@ export function registerIpc(
         question,
         mode,
         context: input.context,
+        notes: input.notes,
         transcript: input.transcript,
       },
       onDelta: (text) => broadcastAnswer({ type: 'delta', id, text }),
@@ -169,6 +201,62 @@ export function registerIpc(
     void event
     return { ok: true as const, id }
   })
+  ipcMain.handle(Ipc.knowledgeList, () => knowledgeStore().list())
+  ipcMain.handle(Ipc.knowledgeContext, () => knowledgeStore().context())
+  ipcMain.handle(Ipc.knowledgeSearch, (_event, query: unknown) => knowledgeStore().search(typeof query === 'string' ? query : ''))
+  ipcMain.handle(Ipc.knowledgeRemove, (_event, id: unknown) => {
+    if (typeof id === 'string') knowledgeStore().remove(id)
+    warmKnowledge()
+    return knowledgeStore().list()
+  })
+  ipcMain.handle(
+    Ipc.knowledgeAdd,
+    (_event, input: { title?: string; text?: string; kind?: KnowledgeKind; triggers?: string[] }) => {
+      const text = typeof input?.text === 'string' ? input.text.trim() : ''
+      if (!text) return { ok: false as const, error: 'Add some text first.' }
+      const kind = input.kind === 'url' || input.kind === 'battlecard' ? input.kind : 'doc'
+      const source = knowledgeStore().add({
+        id: randomUUID(),
+        title: typeof input.title === 'string' ? input.title : '',
+        kind,
+        text,
+        triggers: Array.isArray(input.triggers) ? input.triggers.filter((item) => typeof item === 'string') : undefined,
+      })
+      warmKnowledge()
+      return { ok: true as const, source }
+    },
+  )
+  ipcMain.handle(Ipc.knowledgeUrl, async (_event, url: unknown) => {
+    if (typeof url !== 'string' || !url.trim()) return { ok: false as const, error: 'Paste a link first.' }
+    try {
+      const page = await readUrl(url.trim())
+      const source = knowledgeStore().add({ id: randomUUID(), title: page.title, kind: 'url', text: page.text })
+      warmKnowledge()
+      return { ok: true as const, source }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The link could not be read.'
+      return { ok: false as const, error: message }
+    }
+  })
+  ipcMain.handle(Ipc.knowledgeOpen, async () => {
+    const picked = await dialog.showOpenDialog(windows.panel, {
+      title: 'Load a note',
+      properties: ['openFile'],
+      filters: [{ name: 'Text', extensions: ['txt', 'md', 'markdown'] }],
+    })
+    const filePath = picked.filePaths[0]
+    if (picked.canceled || !filePath) return { ok: false as const, error: 'No file selected.' }
+    try {
+      const note = readNoteFile(filePath)
+      if (!note.text.trim()) return { ok: false as const, error: 'That file was empty.' }
+      const source = knowledgeStore().add({ id: randomUUID(), title: note.title, kind: 'doc', text: note.text })
+      warmKnowledge()
+      return { ok: true as const, source }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The file could not be read.'
+      return { ok: false as const, error: message }
+    }
+  })
 
   for (const window of targets()) {
     window.on('show', () => void publish())
@@ -176,6 +264,15 @@ export function registerIpc(
   }
 
   return { publish }
+}
+
+function cleanCitations(citations: Citation[] | undefined): Citation[] {
+  if (!Array.isArray(citations)) return []
+  return citations.slice(0, 6).flatMap((citation) => {
+    if (!citation || typeof citation.title !== 'string' || typeof citation.excerpt !== 'string') return []
+    const kind = citation.kind === 'url' || citation.kind === 'battlecard' ? citation.kind : 'doc'
+    return [{ title: citation.title.slice(0, 120), kind, excerpt: citation.excerpt.slice(0, 240) }]
+  })
 }
 
 export function focusAsk(windows: DesktopWindows): void {

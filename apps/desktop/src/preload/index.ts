@@ -3,6 +3,8 @@ import type {
   AnswerEvent,
   AskRequest,
   DesktopSettings,
+  KnowledgeHit,
+  KnowledgeSource,
   PitchsideBridge,
   SharePreview,
   Snapshot,
@@ -26,6 +28,13 @@ const api: PitchsideBridge = {
   publishTranscript: (lines) => ipcRenderer.invoke(Ipc.transcriptSync, lines),
   getTranscript: () => ipcRenderer.invoke(Ipc.transcriptGet) as Promise<TranscriptLine[]>,
   ask: (input: AskRequest) => ipcRenderer.invoke(Ipc.ask, input),
+  listKnowledge: () => ipcRenderer.invoke(Ipc.knowledgeList) as Promise<KnowledgeSource[]>,
+  addKnowledge: (input) => ipcRenderer.invoke(Ipc.knowledgeAdd, input),
+  addKnowledgeUrl: (url) => ipcRenderer.invoke(Ipc.knowledgeUrl, url),
+  openKnowledgeFile: () => ipcRenderer.invoke(Ipc.knowledgeOpen),
+  removeKnowledge: (id) => ipcRenderer.invoke(Ipc.knowledgeRemove, id) as Promise<KnowledgeSource[]>,
+  searchKnowledge: (query) => ipcRenderer.invoke(Ipc.knowledgeSearch, query) as Promise<KnowledgeHit[]>,
+  knowledgeContext: () => ipcRenderer.invoke(Ipc.knowledgeContext) as Promise<string>,
   onSnapshot: (listener) => {
     const wrapped = (_event: IpcRendererEvent, snapshot: Snapshot): void => listener(snapshot)
     ipcRenderer.on(Ipc.snapshot, wrapped)

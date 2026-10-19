@@ -12,6 +12,16 @@ export function AnswerView({ card }: { card: AnswerCard }) {
       </div>
       <p className="answer-question">{card.question}</p>
       {card.text ? <pre className="answer-body">{card.text}</pre> : <p className="fine">Waiting for the first line…</p>}
+      {card.citations.length > 0 ? (
+        <ul className="sources">
+          {card.citations.map((citation) => (
+            <li key={`${citation.title}:${citation.excerpt}`}>
+              <strong>{citation.title}</strong>
+              <span>{citation.excerpt}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {card.error ? <p className="warn">{card.error}</p> : null}
     </article>
   )

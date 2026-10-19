@@ -112,3 +112,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   box-shadow: var(--shadow);
 }
 .modal p { color: var(--muted); }
+
+.sources { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.sources li { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+.sources strong { color: var(--paper); font-size: 14px; }

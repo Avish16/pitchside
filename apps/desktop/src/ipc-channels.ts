@@ -19,4 +19,11 @@ export const Ipc = {
   transcript: 'transcript',
   transcriptGet: 'transcript:get',
   ask: 'answers:ask',
+  knowledgeList: 'knowledge:list',
+  knowledgeAdd: 'knowledge:add',
+  knowledgeUrl: 'knowledge:url',
+  knowledgeOpen: 'knowledge:open',
+  knowledgeRemove: 'knowledge:remove',
+  knowledgeSearch: 'knowledge:search',
+  knowledgeContext: 'knowledge:context',
 } as const
