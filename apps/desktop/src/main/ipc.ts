@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
+import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type {
@@ -10,13 +11,16 @@ import type {
   SharePreview,
   SlideHint,
   Snapshot,
+  SummaryEvent,
   TranscriptLine,
+  TriageNotice,
 } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 import { streamBackendAnswer } from './answers'
 import { DeckStore } from './deck-store'
 import { KnowledgeStore, readNoteFile, readUrl } from './knowledge'
 import { readPdfFile, slidesFromPdf } from './pdf'
+import { classifyUtterance, fetchRemoteTriage } from './triage'
 import { prepareCall } from './call'
 import { BACKEND_URL, readBackendHealth } from './health'
 import { hotkeyLabels } from './privacy'
@@ -250,6 +254,68 @@ export function registerIpc(
       const message = error instanceof Error ? error.message : 'The link could not be read.'
       return { ok: false as const, error: message }
     }
+  })
+  const publishTriage = (notice: TriageNotice): void => {
+    for (const window of targets()) {
+      if (!window.isDestroyed()) window.webContents.send(Ipc.triage, notice)
+    }
+  }
+  const publishSummary = (event: SummaryEvent): void => {
+    for (const window of targets()) {
+      if (!window.isDestroyed()) window.webContents.send(Ipc.summary, event)
+    }
+  }
+  ipcMain.handle(Ipc.summarize, () => {
+    const lines = transcript.filter((line) => line.final && line.text.trim())
+    if (lines.length === 0) return { ok: false as const, error: 'There is no transcript to summarize yet.' }
+    const text = lines.map((line) => `${line.speaker === 'you' ? 'You' : 'Client'}: ${line.text}`).join('\n')
+    const settings = currentSettings()
+    publishSummary({ type: 'start' })
+    void streamBackendAnswer({
+      backendUrl: settings.backendUrl,
+      devToken: settings.devToken,
+      path: '/v1/summary',
+      body: { transcript: text },
+      onDelta: (delta) => publishSummary({ type: 'delta', text: delta }),
+    })
+      .then((result) => publishSummary({ type: 'done', provider: result.provider }))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'The summary failed'
+        publishSummary({ type: 'error', message })
+      })
+    return { ok: true as const }
+  })
+  ipcMain.handle(Ipc.exportNotes, async (_event, markdown: unknown) => {
+    const body = typeof markdown === 'string' ? markdown : ''
+    if (!body.trim()) return { ok: false as const, error: 'There is nothing to export yet.' }
+    const picked = await dialog.showSaveDialog(windows.panel, {
+      title: 'Export call notes',
+      defaultPath: 'pitchside-notes.md',
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    if (picked.canceled || !picked.filePath) return { ok: false as const, error: 'Export canceled.' }
+    writeFileSync(picked.filePath, body, 'utf8')
+    return { ok: true as const, path: picked.filePath }
+  })
+  ipcMain.handle(Ipc.classify, async (_event, text: unknown) => {
+    const line = typeof text === 'string' ? text.trim() : ''
+    if (!line) {
+      const empty: TriageNotice = { text: '', kind: 'other', source: 'local', battlecard: null }
+      return empty
+    }
+    const settings = currentSettings()
+    const notice = await classifyUtterance({
+      text: line,
+      matchCard: (value) => knowledgeStore().matchCard(value),
+      fetchRemote: (value) =>
+        fetchRemoteTriage({
+          backendUrl: settings.backendUrl,
+          devToken: settings.devToken,
+          text: value,
+        }),
+    })
+    publishTriage(notice)
+    return notice
   })
   ipcMain.handle(Ipc.deckList, () => deckStore().list())
   ipcMain.handle(Ipc.deckClear, () => {

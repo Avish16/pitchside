@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { LIVE_SYSTEM_PROMPT, answerUserPrompt } from '@pitchside/shared'
+import { LIVE_SYSTEM_PROMPT, SUMMARY_SYSTEM_PROMPT, answerUserPrompt, parseTriageJson, summaryUserPrompt } from '@pitchside/shared'
 import { devTokenAuthenticator } from './auth'
 import { loadConfig, type AppConfig } from './config'
 import { issueDeepgramToken } from './deepgram-token'
@@ -57,6 +57,55 @@ export function buildServer(deps: ServerDeps = defaultDeps()): FastifyInstance {
       break
     }
     return { ok: true, provider: deps.model.provider }
+  })
+
+  app.post<{ Body: { text?: string } }>('/v1/triage', async (request, reply) => {
+    const text = request.body?.text?.trim() ?? ''
+    if (!text) return reply.code(400).send({ error: 'text_required' })
+    if (deps.model.provider === 'offline') return { kind: 'other', confidence: 0, source: 'offline' as const }
+    let raw = ''
+    const iterator = deps.model.stream({
+      model: deps.config.triageModel,
+      system:
+        'Classify one line from a sales call. Reply with JSON only: {"kind":"question|objection|buying_signal|small_talk|other","confidence":0.0}',
+      messages: [{ role: 'user', content: text.slice(0, 600) }],
+      maxTokens: 80,
+      effort: 'low',
+    })
+    for await (const chunk of iterator) raw += chunk
+    const parsed = parseTriageJson(raw)
+    if (!parsed) return { kind: 'other' as const, confidence: 0, source: 'model' as const }
+    return { ...parsed, source: 'model' as const }
+  })
+
+  app.post<{ Body: { transcript?: string } }>('/v1/summary', async (request, reply) => {
+    const transcript = request.body?.transcript?.trim() ?? ''
+    if (!transcript) return reply.code(400).send({ error: 'transcript_required' })
+    const abort = new AbortController()
+    request.raw.on('close', () => abort.abort())
+    const stream = Readable.from(
+      (async function* () {
+        try {
+          const iterator = deps.model.stream({
+            model: deps.config.deepModel,
+            system: SUMMARY_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: summaryUserPrompt(transcript) }],
+            maxTokens: 900,
+            effort: 'high',
+            signal: abort.signal,
+          })
+          for await (const text of iterator) {
+            if (text) yield sse('delta', { text })
+          }
+          yield sse('done', { provider: deps.model.provider, model: deps.config.deepModel })
+        } catch (error) {
+          if (abort.signal.aborted) return
+          const message = error instanceof Error ? error.message : 'The summary failed'
+          yield sse('error', { message: message.slice(0, 300) })
+        }
+      })(),
+    )
+    return reply.type('text/event-stream').send(stream)
   })
 
   app.post<{ Body: { question?: string; mode?: string; context?: string; notes?: string; transcript?: string } }>(

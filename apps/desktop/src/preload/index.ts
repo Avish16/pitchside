@@ -10,7 +10,9 @@ import type {
   SharePreview,
   SlideHint,
   Snapshot,
+  SummaryEvent,
   TranscriptLine,
+  TriageNotice,
 } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 
@@ -45,6 +47,19 @@ const api: PitchsideBridge = {
     const wrapped = (_event: IpcRendererEvent, hint: SlideHint | null): void => listener(hint)
     ipcRenderer.on(Ipc.deckHintEvent, wrapped)
     return () => ipcRenderer.removeListener(Ipc.deckHintEvent, wrapped)
+  },
+  classify: (text) => ipcRenderer.invoke(Ipc.classify, text) as Promise<TriageNotice>,
+  summarize: () => ipcRenderer.invoke(Ipc.summarize),
+  onSummary: (listener) => {
+    const wrapped = (_event: IpcRendererEvent, event: SummaryEvent): void => listener(event)
+    ipcRenderer.on(Ipc.summary, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.summary, wrapped)
+  },
+  exportNotes: (markdown) => ipcRenderer.invoke(Ipc.exportNotes, markdown),
+  onTriage: (listener) => {
+    const wrapped = (_event: IpcRendererEvent, notice: TriageNotice): void => listener(notice)
+    ipcRenderer.on(Ipc.triage, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.triage, wrapped)
   },
   onSnapshot: (listener) => {
     const wrapped = (_event: IpcRendererEvent, snapshot: Snapshot): void => listener(snapshot)

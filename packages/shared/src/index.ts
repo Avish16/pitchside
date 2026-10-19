@@ -53,7 +53,13 @@ export interface AskRequest {
   citations?: Citation[]
 }
 
-export { LIVE_SYSTEM_PROMPT, answerUserPrompt } from './prompts'
+export { LIVE_SYSTEM_PROMPT, SUMMARY_SYSTEM_PROMPT, answerUserPrompt, notesMarkdown, summaryUserPrompt } from './prompts'
+
+export type SummaryEvent =
+  | { type: 'start' }
+  | { type: 'delta'; text: string }
+  | { type: 'done'; provider: string }
+  | { type: 'error'; message: string }
 export { deepgramListenUrl, deepgramProtocols, parseDeepgramMessage } from './deepgram'
 export type { DeepgramInbound } from './deepgram'
 export {
@@ -67,9 +73,12 @@ export {
   stereoFrame,
 } from './audio'
 import type { DeckSlideSummary, SlideHint } from './deck'
+import type { TriageNotice } from './triage'
 import type { Citation, KnowledgeHit, KnowledgeKind, KnowledgeSource } from './knowledge'
 
 export { hintForSlides, slideTitle } from './deck'
+export { matchBattlecard, parseTriageJson, resolveTriage, triageLocal } from './triage'
+export type { LocalTriage, TriageKind, TriageNotice } from './triage'
 export type { DeckSlide, DeckSlideSummary, SlideHint } from './deck'
 import type { TranscriptLine } from './transcript'
 
@@ -130,6 +139,11 @@ export interface PitchsideBridge {
   clearDeck: () => Promise<DeckSlideSummary[]>
   hintDeck: (query: string) => Promise<SlideHint | null>
   onDeckHint: (listener: (hint: SlideHint | null) => void) => () => void
+  classify: (text: string) => Promise<TriageNotice>
+  onTriage: (listener: (notice: TriageNotice) => void) => () => void
+  summarize: () => Promise<{ ok: true } | { ok: false; error: string }>
+  onSummary: (listener: (event: SummaryEvent) => void) => () => void
+  exportNotes: (markdown: string) => Promise<{ ok: true; path: string } | { ok: false; error: string }>
   onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void
   onAskFocus: (listener: () => void) => () => void
   onDeepAsk: (listener: () => void) => () => void

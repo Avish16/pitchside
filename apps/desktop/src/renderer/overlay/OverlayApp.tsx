@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { SlideHint, Snapshot, TranscriptLine } from '@pitchside/shared'
+import type { SlideHint, Snapshot, TranscriptLine, TriageNotice } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
 import { TranscriptList } from '../call/TranscriptList'
+import { TriageBanner } from '../triage/TriageBanner'
 
 const empty: Snapshot = {
   backend: 'unknown',
@@ -18,6 +19,7 @@ export function OverlayApp() {
   const [card, setCard] = useState<AnswerCard | null>(null)
   const [lines, setLines] = useState<TranscriptLine[]>([])
   const [hint, setHint] = useState<SlideHint | null>(null)
+  const [triage, setTriage] = useState<TriageNotice | null>(null)
 
   useEffect(() => {
     if (!bridge) return
@@ -26,6 +28,7 @@ export function OverlayApp() {
     const offSnapshot = bridge.onSnapshot(setSnapshot)
     const offTranscript = bridge.onTranscript(setLines)
     const offHint = bridge.onDeckHint(setHint)
+    const offTriage = bridge.onTriage(setTriage)
     const offAnswer = bridge.onAnswer((event) => {
       setCard((current) => {
         const next = applyAnswerEvent(current ? [current] : [], event)
@@ -36,6 +39,7 @@ export function OverlayApp() {
       offSnapshot()
       offTranscript()
       offHint()
+      offTriage()
       offAnswer()
     }
   }, [bridge])
@@ -56,6 +60,7 @@ export function OverlayApp() {
           <p className="warn">Click-through is on. Press {snapshot.hotkeys.clickThrough} to use this panel again.</p>
         ) : null}
         <div className="answer-scroll">
+          <TriageBanner notice={triage} />
           {hint ? (
             <p className="hint">
               Jump to slide {hint.number} — {hint.title}

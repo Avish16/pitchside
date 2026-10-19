@@ -4,6 +4,7 @@ import {
   formatKnowledge,
   htmlToText,
   indexDocuments,
+  matchBattlecard,
   searchChunks,
   type IndexedChunk,
   type KnowledgeDoc,
@@ -35,6 +36,14 @@ export class KnowledgeStore {
 
   search(query: string): KnowledgeHit[] {
     return searchChunks(this.chunks, query)
+  }
+
+  matchCard(query: string): { title: string; excerpt: string } | null {
+    const direct = matchBattlecard(this.docs.filter((doc) => doc.kind === 'battlecard'), query)
+    if (direct) return direct
+    const hit = this.search(query).find((item) => item.kind === 'battlecard' && item.score >= 0.2)
+    if (!hit) return null
+    return { title: hit.title, excerpt: hit.excerpt }
   }
 
   add(doc: KnowledgeDoc): KnowledgeSource {

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { isLikelyQuestion, type AnswerMode, type DesktopSettings, type SharePreview, type Snapshot } from '@pitchside/shared'
+import type { AnswerMode, DesktopSettings, SharePreview, Snapshot, TriageNotice } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
 import { CallSection } from '../call/CallSection'
 import { askGrounded } from '../ground'
+import { AfterCall } from '../after/AfterCall'
 import { DeckSection } from '../deck/DeckSection'
+import { TriageBanner } from '../triage/TriageBanner'
 import { KnowledgeSection } from '../knowledge/KnowledgeSection'
 
 const empty: Snapshot = {
@@ -30,6 +32,7 @@ export function PanelApp() {
   const [cards, setCards] = useState<AnswerCard[]>([])
   const [asking, setAsking] = useState(false)
   const [askError, setAskError] = useState('')
+  const [triage, setTriage] = useState<TriageNotice | null>(null)
   const askRef = useRef<HTMLTextAreaElement>(null)
   const questionRef = useRef(question)
   questionRef.current = question
@@ -48,6 +51,7 @@ export function PanelApp() {
       const text = questionRef.current.trim()
       if (text) void submit('deep', text)
     })
+    const offTriage = bridge.onTriage(setTriage)
     const offAnswer = bridge.onAnswer((event) => {
       setCards((current) => applyAnswerEvent(current, event))
       if (event.type === 'done' || event.type === 'error') setAsking(false)
@@ -56,6 +60,7 @@ export function PanelApp() {
       offSnapshot()
       offAsk()
       offDeep()
+      offTriage()
       offAnswer()
     }
   }, [bridge])
@@ -115,7 +120,9 @@ export function PanelApp() {
             void bridge.hintDeck(line.text)
           }}
           onClientFinal={(text) => {
-            if (isLikelyQuestion(text)) void submit('fast', text)
+            void bridge.classify(text).then((notice) => {
+              if (notice.kind === 'question') void submit('fast', text)
+            })
           }}
         />
 
@@ -153,8 +160,10 @@ export function PanelApp() {
           {cards[0] ? <AnswerView card={cards[0]} /> : <p className="fine">No answer yet. The offline demo still streams a labeled reply.</p>}
         </section>
 
+        <TriageBanner notice={triage} />
         <KnowledgeSection bridge={bridge} />
         <DeckSection bridge={bridge} />
+        <AfterCall bridge={bridge} />
 
         <section className="card">
           <div className="row">

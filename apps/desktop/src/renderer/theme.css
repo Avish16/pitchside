@@ -117,3 +117,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .sources li { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
 .sources strong { color: var(--paper); font-size: 14px; }
 .hint { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--signal); display: grid; gap: 4px; }
+.triage { margin-top: 12px; padding: 12px; border-radius: 12px; background: rgba(231, 161, 90, 0.08); display: grid; gap: 8px; }
+.triage p { margin: 4px 0 0; color: var(--muted); }
+.check { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--muted); }
+.check input { width: auto; }

@@ -1,14 +1,15 @@
-import { takeSseMessages, type AskRequest } from '@pitchside/shared'
+import { takeSseMessages } from '@pitchside/shared'
 
 export async function streamBackendAnswer(options: {
   backendUrl: string
   devToken: string
-  body: AskRequest
+  path?: string
+  body: unknown
   onDelta: (text: string) => void
   fetchImpl?: typeof fetch
 }): Promise<{ provider: string }> {
   const fetchImpl = options.fetchImpl ?? fetch
-  const response = await fetchImpl(`${options.backendUrl}/v1/answers`, {
+  const response = await fetchImpl(`${options.backendUrl}${options.path ?? '/v1/answers'}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${options.devToken}`,

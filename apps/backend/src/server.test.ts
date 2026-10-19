@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { OfflineModel } from './models/offline'
 import type { LanguageModel, ModelRequest } from './models/types'
 import { loadConfig, type AppConfig } from './config'
 import { anthropicBody, textFromAnthropicPayload } from './models/anthropic-format'
@@ -68,6 +69,24 @@ describe('backend routes', () => {
     await app.close()
   })
 
+  it('writes the post-call draft with the deep model and only the transcript', async () => {
+    const model = new FakeModel()
+    const app = appWith(model)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/summary',
+      headers: { authorization: 'Bearer pitchside-dev' },
+      payload: { transcript: 'Client: What is the seat price?\nYou: Forty dollars.' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('Quote the list price')
+    expect(model.last?.model).toBe('claude-opus-5-5')
+    expect(model.last?.effort).toBe('high')
+    expect(model.last?.messages[0]?.content).toContain('Forty dollars')
+    expect(model.last?.cachedContext).toBeUndefined()
+    await app.close()
+  })
+
   it('uses the deep model when asked', async () => {
     const model = new FakeModel()
     const app = appWith(model)
@@ -102,6 +121,38 @@ describe('backend routes', () => {
     expect(missing.json()).toEqual({ accessToken: 'dg-temp', expiresIn: 60 })
     expect(missing.body).not.toContain('dg-secret')
     expect(seen[0]).toBe('Token dg-secret')
+    await app.close()
+  })
+
+  it('classifies an ambiguous line with the triage model', async () => {
+    const model = new FakeModel()
+    model.stream = async function* (request: ModelRequest) {
+      model.last = request
+      yield '{"kind":"objection","confidence":0.81}'
+    }
+    const app = appWith(model)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/triage',
+      headers: { authorization: 'Bearer pitchside-dev' },
+      payload: { text: 'Is the price too expensive to move forward?' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ kind: 'objection', source: 'model' })
+    expect(model.last?.model).toBe('claude-haiku-5-5')
+    expect(model.last?.effort).toBe('low')
+    await app.close()
+  })
+
+  it('skips the model when the provider is offline', async () => {
+    const app = buildServer({ config, model: new OfflineModel() })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/triage',
+      headers: { authorization: 'Bearer pitchside-dev' },
+      payload: { text: 'hello' },
+    })
+    expect(response.json()).toMatchObject({ source: 'offline' })
     await app.close()
   })
 

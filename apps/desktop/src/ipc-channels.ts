@@ -31,4 +31,9 @@ export const Ipc = {
   deckClear: 'deck:clear',
   deckHint: 'deck:hint',
   deckHintEvent: 'deck:hint-event',
+  classify: 'triage:classify',
+  triage: 'triage',
+  summarize: 'summary:run',
+  summary: 'summary',
+  exportNotes: 'notes:export',
 } as const
