@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Snapshot, TranscriptLine } from '@pitchside/shared'
+import type { SlideHint, Snapshot, TranscriptLine } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
 import { TranscriptList } from '../call/TranscriptList'
@@ -17,6 +17,7 @@ export function OverlayApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>(empty)
   const [card, setCard] = useState<AnswerCard | null>(null)
   const [lines, setLines] = useState<TranscriptLine[]>([])
+  const [hint, setHint] = useState<SlideHint | null>(null)
 
   useEffect(() => {
     if (!bridge) return
@@ -24,6 +25,7 @@ export function OverlayApp() {
     void bridge.getTranscript().then(setLines)
     const offSnapshot = bridge.onSnapshot(setSnapshot)
     const offTranscript = bridge.onTranscript(setLines)
+    const offHint = bridge.onDeckHint(setHint)
     const offAnswer = bridge.onAnswer((event) => {
       setCard((current) => {
         const next = applyAnswerEvent(current ? [current] : [], event)
@@ -33,6 +35,7 @@ export function OverlayApp() {
     return () => {
       offSnapshot()
       offTranscript()
+      offHint()
       offAnswer()
     }
   }, [bridge])
@@ -53,6 +56,11 @@ export function OverlayApp() {
           <p className="warn">Click-through is on. Press {snapshot.hotkeys.clickThrough} to use this panel again.</p>
         ) : null}
         <div className="answer-scroll">
+          {hint ? (
+            <p className="hint">
+              Jump to slide {hint.number} — {hint.title}
+            </p>
+          ) : null}
           <TranscriptList lines={lines} limit={5} />
           {card ? (
             <AnswerView card={card} />

@@ -2,11 +2,13 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type {
   AnswerEvent,
   AskRequest,
+  DeckSlideSummary,
   DesktopSettings,
   KnowledgeHit,
   KnowledgeSource,
   PitchsideBridge,
   SharePreview,
+  SlideHint,
   Snapshot,
   TranscriptLine,
 } from '@pitchside/shared'
@@ -35,6 +37,15 @@ const api: PitchsideBridge = {
   removeKnowledge: (id) => ipcRenderer.invoke(Ipc.knowledgeRemove, id) as Promise<KnowledgeSource[]>,
   searchKnowledge: (query) => ipcRenderer.invoke(Ipc.knowledgeSearch, query) as Promise<KnowledgeHit[]>,
   knowledgeContext: () => ipcRenderer.invoke(Ipc.knowledgeContext) as Promise<string>,
+  listDeck: () => ipcRenderer.invoke(Ipc.deckList) as Promise<DeckSlideSummary[]>,
+  openDeck: () => ipcRenderer.invoke(Ipc.deckOpen),
+  clearDeck: () => ipcRenderer.invoke(Ipc.deckClear) as Promise<DeckSlideSummary[]>,
+  hintDeck: (query) => ipcRenderer.invoke(Ipc.deckHint, query) as Promise<SlideHint | null>,
+  onDeckHint: (listener) => {
+    const wrapped = (_event: IpcRendererEvent, hint: SlideHint | null): void => listener(hint)
+    ipcRenderer.on(Ipc.deckHintEvent, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.deckHintEvent, wrapped)
+  },
   onSnapshot: (listener) => {
     const wrapped = (_event: IpcRendererEvent, snapshot: Snapshot): void => listener(snapshot)
     ipcRenderer.on(Ipc.snapshot, wrapped)

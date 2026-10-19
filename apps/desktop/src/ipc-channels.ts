@@ -26,4 +26,9 @@ export const Ipc = {
   knowledgeRemove: 'knowledge:remove',
   knowledgeSearch: 'knowledge:search',
   knowledgeContext: 'knowledge:context',
+  deckList: 'deck:list',
+  deckOpen: 'deck:open',
+  deckClear: 'deck:clear',
+  deckHint: 'deck:hint',
+  deckHintEvent: 'deck:hint-event',
 } as const

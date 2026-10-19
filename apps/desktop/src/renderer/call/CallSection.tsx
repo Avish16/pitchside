@@ -12,9 +12,11 @@ const idleCapture: CaptureStatus = {
 export function CallSection({
   bridge,
   onClientFinal,
+  onFinal,
 }: {
   bridge: PitchsideBridge
   onClientFinal?: (text: string) => void
+  onFinal?: (line: { speaker: 'you' | 'client'; text: string }) => void
 }) {
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
@@ -27,7 +29,9 @@ export function CallSection({
   const linesRef = useRef<TranscriptLine[]>([])
   const stopRef = useRef<(() => void) | null>(null)
   const onFinalRef = useRef(onClientFinal)
+  const onAnyFinalRef = useRef(onFinal)
   onFinalRef.current = onClientFinal
+  onAnyFinalRef.current = onFinal
 
   useEffect(() => {
     void bridge.getSettings().then((settings) => setConsentAccepted(settings.consentAccepted))
@@ -44,8 +48,9 @@ export function CallSection({
     linesRef.current = next
     setLines(next)
     void bridge.publishTranscript(next)
-    if (event.type === 'final' && event.speaker === 'client' && event.text.trim()) {
-      onFinalRef.current?.(event.text.trim())
+    if (event.type === 'final' && event.text.trim()) {
+      onAnyFinalRef.current?.({ speaker: event.speaker, text: event.text.trim() })
+      if (event.speaker === 'client') onFinalRef.current?.(event.text.trim())
     }
   }
 

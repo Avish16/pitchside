@@ -40,8 +40,14 @@ export interface Citation {
 
 const DIMS = 256
 
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'with', 'is', 'are', 'was', 'be', 'it', 'this', 'that',
+  'how', 'what', 'when', 'where', 'who', 'why', 'can', 'you', 'we', 'our', 'your', 'me', 'my', 'do', 'does', 'did',
+  'long', 'much', 'many', 'show', 'please', 'just', 'about',
+])
+
 export function tokenize(text: string): string[] {
-  return text.toLowerCase().match(/[a-z0-9']+/g) ?? []
+  return (text.toLowerCase().match(/[a-z0-9']+/g) ?? []).filter((token) => token.length > 1 && !STOPWORDS.has(token))
 }
 
 function hashToken(token: string): number {

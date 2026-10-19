@@ -4,6 +4,7 @@ import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
 import { CallSection } from '../call/CallSection'
 import { askGrounded } from '../ground'
+import { DeckSection } from '../deck/DeckSection'
 import { KnowledgeSection } from '../knowledge/KnowledgeSection'
 
 const empty: Snapshot = {
@@ -110,6 +111,9 @@ export function PanelApp() {
 
         <CallSection
           bridge={bridge}
+          onFinal={(line) => {
+            void bridge.hintDeck(line.text)
+          }}
           onClientFinal={(text) => {
             if (isLikelyQuestion(text)) void submit('fast', text)
           }}
@@ -150,6 +154,7 @@ export function PanelApp() {
         </section>
 
         <KnowledgeSection bridge={bridge} />
+        <DeckSection bridge={bridge} />
 
         <section className="card">
           <div className="row">

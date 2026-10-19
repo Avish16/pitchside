@@ -116,3 +116,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .sources { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .sources li { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
 .sources strong { color: var(--paper); font-size: 14px; }
+.hint { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--signal); display: grid; gap: 4px; }

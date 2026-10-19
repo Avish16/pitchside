@@ -66,7 +66,11 @@ export {
   shouldKeepAlive,
   stereoFrame,
 } from './audio'
+import type { DeckSlideSummary, SlideHint } from './deck'
 import type { Citation, KnowledgeHit, KnowledgeKind, KnowledgeSource } from './knowledge'
+
+export { hintForSlides, slideTitle } from './deck'
+export type { DeckSlide, DeckSlideSummary, SlideHint } from './deck'
 import type { TranscriptLine } from './transcript'
 
 export type { Citation, IndexedChunk, KnowledgeDoc, KnowledgeHit, KnowledgeKind, KnowledgeSource } from './knowledge'
@@ -121,6 +125,11 @@ export interface PitchsideBridge {
   removeKnowledge: (id: string) => Promise<KnowledgeSource[]>
   searchKnowledge: (query: string) => Promise<KnowledgeHit[]>
   knowledgeContext: () => Promise<string>
+  listDeck: () => Promise<DeckSlideSummary[]>
+  openDeck: () => Promise<{ ok: true; slides: DeckSlideSummary[] } | { ok: false; error: string }>
+  clearDeck: () => Promise<DeckSlideSummary[]>
+  hintDeck: (query: string) => Promise<SlideHint | null>
+  onDeckHint: (listener: (hint: SlideHint | null) => void) => () => void
   onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void
   onAskFocus: (listener: () => void) => () => void
   onDeepAsk: (listener: () => void) => () => void

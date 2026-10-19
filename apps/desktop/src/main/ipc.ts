@@ -8,12 +8,15 @@ import type {
   DesktopSettings,
   KnowledgeKind,
   SharePreview,
+  SlideHint,
   Snapshot,
   TranscriptLine,
 } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 import { streamBackendAnswer } from './answers'
+import { DeckStore } from './deck-store'
 import { KnowledgeStore, readNoteFile, readUrl } from './knowledge'
+import { readPdfFile, slidesFromPdf } from './pdf'
 import { prepareCall } from './call'
 import { BACKEND_URL, readBackendHealth } from './health'
 import { hotkeyLabels } from './privacy'
@@ -108,6 +111,16 @@ export function registerIpc(
     backendUrl: BACKEND_URL,
   })
 
+  let deck: DeckStore | null = null
+  const deckStore = (): DeckStore => {
+    if (!deck) deck = new DeckStore(join(app.getPath('userData'), 'deck.json'))
+    return deck
+  }
+  const publishHint = (hint: SlideHint | null): void => {
+    for (const window of targets()) {
+      if (!window.isDestroyed()) window.webContents.send(Ipc.deckHintEvent, hint)
+    }
+  }
   let knowledge: KnowledgeStore | null = null
   const knowledgeStore = (): KnowledgeStore => {
     if (!knowledge) knowledge = new KnowledgeStore(join(app.getPath('userData'), 'knowledge.json'))
@@ -235,6 +248,36 @@ export function registerIpc(
       return { ok: true as const, source }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The link could not be read.'
+      return { ok: false as const, error: message }
+    }
+  })
+  ipcMain.handle(Ipc.deckList, () => deckStore().list())
+  ipcMain.handle(Ipc.deckClear, () => {
+    deckStore().clear()
+    publishHint(null)
+    return deckStore().list()
+  })
+  ipcMain.handle(Ipc.deckHint, (_event, query: unknown) => {
+    const hint = deckStore().hint(typeof query === 'string' ? query : '')
+    if (hint) publishHint(hint)
+    return hint
+  })
+  ipcMain.handle(Ipc.deckOpen, async () => {
+    const picked = await dialog.showOpenDialog(windows.panel, {
+      title: 'Load a deck',
+      properties: ['openFile'],
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    })
+    const filePath = picked.filePaths[0]
+    if (picked.canceled || !filePath) return { ok: false as const, error: 'No deck selected.' }
+    try {
+      const slides = await slidesFromPdf(readPdfFile(filePath))
+      if (slides.length === 0) return { ok: false as const, error: 'That PDF had no pages.' }
+      const summaries = deckStore().replace(slides)
+      publishHint(null)
+      return { ok: true as const, slides: summaries }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The deck could not be read.'
       return { ok: false as const, error: message }
     }
   })
