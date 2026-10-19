@@ -1,0 +1,40 @@
+appId: com.pitchside.desktop
+productName: Pitchside
+directories:
+  output: release
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!vitest.config.{js,ts}'
+  - '!{.env,.env.*}'
+  - '!{tsconfig.json,tsconfig.*.json}'
+  - '!README.md'
+win:
+  executableName: pitchside
+  target:
+    - nsis
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+    - zip
+  extendInfo:
+    NSMicrophoneUsageDescription: Pitchside uses the microphone to transcribe your side of a sales or customer call.
+    NSAudioCaptureUsageDescription: Pitchside uses system audio to transcribe the other people on the call.
+    NSScreenCaptureUsageDescription: Pitchside requests display capture to hear system audio and to preview what a screen share would include. Video is not uploaded.
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+  category: Office
+  executableName: pitchside
+appImage:
+  artifactName: ${name}-${version}.${ext}
+npmRebuild: false

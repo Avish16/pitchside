@@ -1,11 +1,9 @@
 node_modules
+dist
 out
 release
-dist
 .env
-.env.*
-!.env.example
+.turbo
 *.log
 .DS_Store
 *.tsbuildinfo
-.eslintcache
