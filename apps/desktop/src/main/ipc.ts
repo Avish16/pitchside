@@ -1,16 +1,29 @@
 import { app, ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import type { AnswerEvent, AskRequest, DesktopSettings, SharePreview, Snapshot } from '@pitchside/shared'
+import type { AnswerEvent, AskRequest, DesktopSettings, SharePreview, Snapshot, TranscriptLine } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 import { streamBackendAnswer } from './answers'
+import { prepareCall } from './call'
 import { BACKEND_URL, readBackendHealth } from './health'
 import { hotkeyLabels } from './privacy'
-import { readLocalSettings, writeLocalSettings } from './settings'
+import { readLocalSettings, updateLocalSettings } from './settings'
 import { showOverlay, type DesktopWindows } from './windows'
 
 let clickThrough = false
 let afterClickThrough: () => void = () => undefined
+let transcript: TranscriptLine[] = []
+
+function isTranscriptLine(value: unknown): value is TranscriptLine {
+  if (!value || typeof value !== 'object') return false
+  const line = value as TranscriptLine
+  return (
+    typeof line.id === 'string' &&
+    (line.speaker === 'you' || line.speaker === 'client') &&
+    typeof line.text === 'string' &&
+    typeof line.final === 'boolean'
+  )
+}
 
 export function settingsPath(): string {
   return join(app.getPath('userData'), 'settings.json')
@@ -109,8 +122,26 @@ export function registerIpc(
   ipcMain.handle(Ipc.getSettings, () => currentSettings())
   ipcMain.handle(Ipc.saveSettings, (_event, input: { devToken?: string }) => {
     const devToken = typeof input?.devToken === 'string' ? input.devToken : ''
-    writeLocalSettings(settingsPath(), { devToken })
+    updateLocalSettings(settingsPath(), { devToken })
     return currentSettings()
+  })
+  ipcMain.handle(Ipc.acceptConsent, () => {
+    updateLocalSettings(settingsPath(), { consentAccepted: true })
+    return currentSettings()
+  })
+  ipcMain.handle(Ipc.prepareCall, () => {
+    const settings = currentSettings()
+    return prepareCall({
+      consentAccepted: settings.consentAccepted,
+      backendUrl: settings.backendUrl,
+      devToken: settings.devToken,
+    })
+  })
+  ipcMain.handle(Ipc.transcriptGet, () => transcript)
+  ipcMain.handle(Ipc.transcriptSync, (_event, lines: unknown) => {
+    if (!Array.isArray(lines)) return
+    transcript = lines.filter(isTranscriptLine).slice(-400)
+    if (!windows.overlay.isDestroyed()) windows.overlay.webContents.send(Ipc.transcript, transcript)
   })
   ipcMain.handle(Ipc.ask, (event, input: AskRequest) => {
     const question = input?.question?.trim() ?? ''

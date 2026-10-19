@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import type { Snapshot } from '@pitchside/shared'
+import type { Snapshot, TranscriptLine } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
+import { TranscriptList } from '../call/TranscriptList'
 
 const empty: Snapshot = {
   backend: 'unknown',
@@ -15,11 +16,14 @@ export function OverlayApp() {
   const bridge = window.pitchside
   const [snapshot, setSnapshot] = useState<Snapshot>(empty)
   const [card, setCard] = useState<AnswerCard | null>(null)
+  const [lines, setLines] = useState<TranscriptLine[]>([])
 
   useEffect(() => {
     if (!bridge) return
     void bridge.getSnapshot().then(setSnapshot)
+    void bridge.getTranscript().then(setLines)
     const offSnapshot = bridge.onSnapshot(setSnapshot)
+    const offTranscript = bridge.onTranscript(setLines)
     const offAnswer = bridge.onAnswer((event) => {
       setCard((current) => {
         const next = applyAnswerEvent(current ? [current] : [], event)
@@ -28,6 +32,7 @@ export function OverlayApp() {
     })
     return () => {
       offSnapshot()
+      offTranscript()
       offAnswer()
     }
   }, [bridge])
@@ -48,6 +53,7 @@ export function OverlayApp() {
           <p className="warn">Click-through is on. Press {snapshot.hotkeys.clickThrough} to use this panel again.</p>
         ) : null}
         <div className="answer-scroll">
+          <TranscriptList lines={lines} limit={5} />
           {card ? (
             <AnswerView card={card} />
           ) : (

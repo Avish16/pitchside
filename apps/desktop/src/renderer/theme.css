@@ -86,3 +86,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .answer-scroll { flex: 1; overflow: auto; min-height: 0; }
 .warn { color: var(--signal); }
+
+.transcript { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.line { display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
+.line.partial { opacity: 0.72; }
+.speaker { font-size: 12px; font-weight: 700; }
+.speaker.you { color: var(--signal); }
+.speaker.client { color: var(--good); }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 6, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 5;
+}
+.modal {
+  width: min(520px, 100%);
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.modal p { color: var(--muted); }

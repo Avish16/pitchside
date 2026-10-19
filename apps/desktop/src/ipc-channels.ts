@@ -13,5 +13,10 @@ export const Ipc = {
   answer: 'answer',
   getSettings: 'settings:get',
   saveSettings: 'settings:save',
+  acceptConsent: 'consent:accept',
+  prepareCall: 'call:prepare',
+  transcriptSync: 'transcript:sync',
+  transcript: 'transcript',
+  transcriptGet: 'transcript:get',
   ask: 'answers:ask',
 } as const

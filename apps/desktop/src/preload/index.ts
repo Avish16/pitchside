@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { AnswerEvent, AskRequest, DesktopSettings, PitchsideBridge, SharePreview, Snapshot } from '@pitchside/shared'
+import type {
+  AnswerEvent,
+  AskRequest,
+  DesktopSettings,
+  PitchsideBridge,
+  SharePreview,
+  Snapshot,
+  TranscriptLine,
+} from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 
 const api: PitchsideBridge = {
@@ -13,6 +21,10 @@ const api: PitchsideBridge = {
   quit: () => ipcRenderer.invoke(Ipc.quit),
   getSettings: () => ipcRenderer.invoke(Ipc.getSettings) as Promise<DesktopSettings>,
   saveSettings: (input) => ipcRenderer.invoke(Ipc.saveSettings, input) as Promise<DesktopSettings>,
+  acceptConsent: () => ipcRenderer.invoke(Ipc.acceptConsent) as Promise<DesktopSettings>,
+  prepareCall: () => ipcRenderer.invoke(Ipc.prepareCall),
+  publishTranscript: (lines) => ipcRenderer.invoke(Ipc.transcriptSync, lines),
+  getTranscript: () => ipcRenderer.invoke(Ipc.transcriptGet) as Promise<TranscriptLine[]>,
   ask: (input: AskRequest) => ipcRenderer.invoke(Ipc.ask, input),
   onSnapshot: (listener) => {
     const wrapped = (_event: IpcRendererEvent, snapshot: Snapshot): void => listener(snapshot)
@@ -33,6 +45,11 @@ const api: PitchsideBridge = {
     const wrapped = (_event: IpcRendererEvent, payload: AnswerEvent): void => listener(payload)
     ipcRenderer.on(Ipc.answer, wrapped)
     return () => ipcRenderer.removeListener(Ipc.answer, wrapped)
+  },
+  onTranscript: (listener) => {
+    const wrapped = (_event: IpcRendererEvent, lines: TranscriptLine[]): void => listener(lines)
+    ipcRenderer.on(Ipc.transcript, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.transcript, wrapped)
   },
 }
 

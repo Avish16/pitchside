@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AnswerMode, DesktopSettings, SharePreview, Snapshot } from '@pitchside/shared'
 import { applyAnswerEvent, type AnswerCard } from '../answers'
 import { AnswerView } from '../AnswerView'
+import { CallSection } from '../call/CallSection'
 
 const empty: Snapshot = {
   backend: 'unknown',
@@ -16,7 +17,11 @@ export function PanelApp() {
   const [snapshot, setSnapshot] = useState<Snapshot>(empty)
   const [preview, setPreview] = useState<SharePreview | null>(null)
   const [previewing, setPreviewing] = useState(false)
-  const [settings, setSettings] = useState<DesktopSettings>({ devToken: 'pitchside-dev', backendUrl: 'http://127.0.0.1:43124' })
+  const [settings, setSettings] = useState<DesktopSettings>({
+    devToken: 'pitchside-dev',
+    backendUrl: 'http://127.0.0.1:43124',
+    consentAccepted: false,
+  })
   const [tokenDraft, setTokenDraft] = useState('pitchside-dev')
   const [question, setQuestion] = useState('')
   const [cards, setCards] = useState<AnswerCard[]>([])
@@ -92,14 +97,16 @@ export function PanelApp() {
           <div>
             <h1>Ask from the sideline</h1>
             <p>
-              Type a question from the call. The backend streams a short answer into this panel and the overlay. Provider
-              keys stay on the backend.
+              Listen locally, then type a question from the call. The backend streams a short answer into this panel and
+              the overlay. Provider keys stay on the backend.
             </p>
           </div>
           <button type="button" className="ghost" onClick={() => void bridge.quit()}>
             Quit
           </button>
         </header>
+
+        <CallSection bridge={bridge} />
 
         <section className="card">
           <h2>Question</h2>

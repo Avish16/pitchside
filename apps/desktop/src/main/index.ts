@@ -1,4 +1,5 @@
 import { app, BrowserWindow, globalShortcut } from 'electron'
+import { installCaptureHandlers } from './loopback'
 import { clickThroughEnabled, focusAsk, focusDeep, registerIpc, setClickThrough } from './ipc'
 import { HOTKEY_ASK, HOTKEY_CLICK_THROUGH, HOTKEY_DEEP, HOTKEY_TOGGLE } from './privacy'
 import { createTray } from './tray'
@@ -29,6 +30,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     if (process.platform === 'darwin') app.setActivationPolicy('accessory')
+    installCaptureHandlers()
     windows = createWindows()
     registerIpc(windows, quit)
     createTray(windows, quit)

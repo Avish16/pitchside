@@ -36,7 +36,13 @@ export type AnswerEvent =
 export interface DesktopSettings {
   devToken: string
   backendUrl: string
+  consentAccepted: boolean
 }
+
+export type CallPreparation =
+  | { ok: true; mode: 'deepgram'; accessToken: string; listenUrl: string; expiresIn: number }
+  | { ok: true; mode: 'local'; reason: string }
+  | { ok: false; error: string }
 
 export interface AskRequest {
   question: string
@@ -46,6 +52,22 @@ export interface AskRequest {
 }
 
 export { LIVE_SYSTEM_PROMPT, answerUserPrompt } from './prompts'
+export { deepgramListenUrl, deepgramProtocols, parseDeepgramMessage } from './deepgram'
+export type { DeepgramInbound } from './deepgram'
+export {
+  SpeechGate,
+  downsample,
+  floatToPcm16,
+  interleaveStereo,
+  pcmBytes,
+  rms,
+  shouldKeepAlive,
+  stereoFrame,
+} from './audio'
+import type { TranscriptLine } from './transcript'
+
+export { reduceTranscript, speakerLabel } from './transcript'
+export type { Speaker, TranscriptEvent, TranscriptLine } from './transcript'
 
 export function parseHealth(payload: unknown): HealthStatus | null {
   if (!payload || typeof payload !== 'object') return null
@@ -65,11 +87,16 @@ export interface PitchsideBridge {
   quit: () => Promise<void>
   getSettings: () => Promise<DesktopSettings>
   saveSettings: (input: { devToken: string }) => Promise<DesktopSettings>
+  acceptConsent: () => Promise<DesktopSettings>
+  prepareCall: () => Promise<CallPreparation>
+  publishTranscript: (lines: TranscriptLine[]) => Promise<void>
+  getTranscript: () => Promise<TranscriptLine[]>
   ask: (input: AskRequest) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void
   onAskFocus: (listener: () => void) => () => void
   onDeepAsk: (listener: () => void) => () => void
   onAnswer: (listener: (event: AnswerEvent) => void) => () => void
+  onTranscript: (listener: (lines: TranscriptLine[]) => void) => () => void
 }
 
 export interface SseMessage {
