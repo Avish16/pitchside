@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Snapshot } from '@pitchside/shared'
 
-const empty: Snapshot = { backend: 'unknown', overlayVisible: true, platform: 'linux' }
+const empty: Snapshot = {
+  backend: 'unknown',
+  overlayVisible: true,
+  clickThrough: false,
+  platform: 'linux',
+  hotkeys: { toggle: 'Ctrl+Shift+Space', clickThrough: 'Ctrl+Shift+C', ask: 'Ctrl+Shift+A' },
+}
 
 export function OverlayApp() {
   const bridge = window.pitchside
@@ -29,10 +35,17 @@ export function OverlayApp() {
           Talking points and the rolling transcript will sit here once a call is running. Open the control panel to
           connect the backend and start.
         </p>
+        {snapshot.clickThrough ? (
+          <p className="warn">Click-through is on. Press {snapshot.hotkeys.clickThrough} to use this panel again.</p>
+        ) : null}
         <div className="row">
           <span className={`pill ${snapshot.backend}`}>Backend {snapshot.backend}</span>
-          <span className="pill">Overlay</span>
+          <span className="pill">Excluded from capture</span>
         </div>
+        <p className="fine">
+          {snapshot.hotkeys.toggle} show or hide · {snapshot.hotkeys.clickThrough} click-through · {snapshot.hotkeys.ask}{' '}
+          control panel
+        </p>
         {!bridge ? <p className="warn">This window only works inside the Pitchside desktop app.</p> : null}
       </section>
     </div>

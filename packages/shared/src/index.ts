@@ -5,10 +5,23 @@ export interface HealthStatus {
 
 export type BackendLink = 'unknown' | 'up' | 'down'
 
+export interface HotkeyLabels {
+  toggle: string
+  clickThrough: string
+  ask: string
+}
+
 export interface Snapshot {
   backend: BackendLink
   overlayVisible: boolean
+  clickThrough: boolean
   platform: NodeJS.Platform
+  hotkeys: HotkeyLabels
+}
+
+export interface SharePreview {
+  image: string
+  note: string
 }
 
 export function parseHealth(payload: unknown): HealthStatus | null {
@@ -24,6 +37,9 @@ export interface PitchsideBridge {
   showOverlay: () => Promise<void>
   hideOverlay: () => Promise<void>
   showPanel: () => Promise<void>
+  toggleClickThrough: () => Promise<boolean>
+  testShare: () => Promise<SharePreview>
   quit: () => Promise<void>
   onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void
+  onAskFocus: (listener: () => void) => () => void
 }

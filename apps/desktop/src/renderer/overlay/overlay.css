@@ -33,4 +33,5 @@
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.warn { color: var(--bad); }
+.warn { color: var(--signal); }
+.fine { font-size: 12px; }

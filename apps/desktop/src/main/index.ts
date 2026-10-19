@@ -1,7 +1,8 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, globalShortcut } from 'electron'
+import { clickThroughEnabled, focusAsk, registerIpc, setClickThrough } from './ipc'
+import { HOTKEY_ASK, HOTKEY_CLICK_THROUGH, HOTKEY_TOGGLE } from './privacy'
 import { createTray } from './tray'
-import { registerIpc } from './ipc'
-import { createWindows } from './windows'
+import { createWindows, showOverlay } from './windows'
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('enable-transparent-visuals')
@@ -27,9 +28,26 @@ if (!gotLock) {
   let windows: ReturnType<typeof createWindows> | null = null
 
   app.whenReady().then(() => {
+    if (process.platform === 'darwin') app.setActivationPolicy('accessory')
     windows = createWindows()
     registerIpc(windows, quit)
     createTray(windows, quit)
+
+    const toggle = (): void => {
+      if (!windows) return
+      if (windows.overlay.isVisible()) windows.overlay.hide()
+      else showOverlay(windows.overlay)
+    }
+    const passThrough = (): void => {
+      if (!windows) return
+      setClickThrough(windows.overlay, !clickThroughEnabled())
+    }
+    globalShortcut.register(HOTKEY_TOGGLE, toggle)
+    globalShortcut.register(HOTKEY_CLICK_THROUGH, passThrough)
+    globalShortcut.register(HOTKEY_ASK, () => {
+      if (windows) focusAsk(windows)
+    })
+    app.on('will-quit', () => globalShortcut.unregisterAll())
 
     for (const window of [windows.overlay, windows.panel]) {
       window.on('close', (event) => {

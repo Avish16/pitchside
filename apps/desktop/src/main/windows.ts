@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
+import { applyCaptureExclusion, overlayWindowOptions } from './privacy'
 
 export interface DesktopWindows {
   overlay: BrowserWindow
@@ -23,25 +24,11 @@ export function createWindows(): DesktopWindows {
   const workArea = screen.getPrimaryDisplay().workArea
 
   const overlay = new BrowserWindow({
-    width: 400,
-    height: 640,
+    ...overlayWindowOptions(preload, process.platform),
     x: workArea.x + workArea.width - 416,
     y: workArea.y + 24,
-    title: 'Pitchside overlay',
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: true,
-    show: false,
-    autoHideMenuBar: true,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      preload,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
   })
+  applyCaptureExclusion(overlay)
 
   const panel = new BrowserWindow({
     width: 980,
@@ -52,6 +39,7 @@ export function createWindows(): DesktopWindows {
     y: workArea.y + 48,
     title: 'Pitchside',
     show: false,
+    skipTaskbar: true,
     autoHideMenuBar: true,
     backgroundColor: '#14120e',
     webPreferences: {
@@ -61,6 +49,7 @@ export function createWindows(): DesktopWindows {
       sandbox: true,
     },
   })
+  panel.setSkipTaskbar(true)
 
   for (const window of [overlay, panel]) {
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -72,9 +61,18 @@ export function createWindows(): DesktopWindows {
     })
   }
 
-  overlay.on('ready-to-show', () => overlay.show())
+  overlay.on('ready-to-show', () => {
+    applyCaptureExclusion(overlay)
+    overlay.showInactive()
+  })
+  overlay.on('show', () => applyCaptureExclusion(overlay))
   panel.on('ready-to-show', () => panel.show())
   load(overlay, 'overlay.html')
   load(panel, 'panel.html')
   return { overlay, panel }
+}
+
+export function showOverlay(overlay: BrowserWindow): void {
+  applyCaptureExclusion(overlay)
+  overlay.showInactive()
 }

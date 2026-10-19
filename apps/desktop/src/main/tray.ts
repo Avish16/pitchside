@@ -1,5 +1,6 @@
 import { Menu, Tray, nativeImage, type NativeImage } from 'electron'
-import type { DesktopWindows } from './windows'
+import { clickThroughEnabled, setClickThrough } from './ipc'
+import { showOverlay, type DesktopWindows } from './windows'
 
 function trayImage(): NativeImage {
   const size = 16
@@ -25,15 +26,23 @@ export function createTray(windows: DesktopWindows, quit: () => void): Tray | nu
   try {
     const tray = new Tray(trayImage())
     tray.setToolTip('Pitchside')
-    const menu = (): Menu =>
-      Menu.buildFromTemplate([
-        { label: 'Show overlay', click: () => windows.overlay.show() },
-        { label: 'Hide overlay', click: () => windows.overlay.hide() },
-        { label: 'Open control panel', click: () => windows.panel.show() },
-        { type: 'separator' },
-        { label: 'Quit Pitchside', click: quit },
-      ])
-    tray.setContextMenu(menu())
+    const refresh = (): void => {
+      tray.setContextMenu(
+        Menu.buildFromTemplate([
+          { label: 'Show overlay', click: () => showOverlay(windows.overlay) },
+          { label: 'Hide overlay', click: () => windows.overlay.hide() },
+          {
+            label: clickThroughEnabled() ? 'Turn click-through off' : 'Turn click-through on',
+            click: () => setClickThrough(windows.overlay, !clickThroughEnabled()),
+          },
+          { label: 'Open control panel', click: () => windows.panel.show() },
+          { type: 'separator' },
+          { label: 'Quit Pitchside', click: quit },
+        ]),
+      )
+    }
+    refresh()
+    tray.on('right-click', refresh)
     tray.on('click', () => windows.panel.show())
     return tray
   } catch (error) {
