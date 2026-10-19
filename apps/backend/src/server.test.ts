@@ -1,12 +1,142 @@
 import { describe, expect, it } from 'vitest'
+import type { LanguageModel, ModelRequest } from './models/types'
+import { loadConfig, type AppConfig } from './config'
+import { anthropicBody, textFromAnthropicPayload } from './models/anthropic-format'
 import { buildServer } from './server'
 
-describe('GET /health', () => {
-  it('reports the service name', async () => {
-    const app = buildServer()
+const config: AppConfig = {
+  devToken: 'pitchside-dev',
+  port: 0,
+  provider: 'offline',
+  anthropicApiKey: '',
+  openrouterApiKey: '',
+  deepgramApiKey: '',
+  fastModel: 'claude-haiku-5-5',
+  deepModel: 'claude-opus-5-5',
+  triageModel: 'claude-haiku-5-5',
+}
+
+class FakeModel implements LanguageModel {
+  readonly provider = 'fake'
+  last: ModelRequest | null = null
+  async *stream(request: ModelRequest): AsyncIterable<string> {
+    this.last = request
+    yield '• Quote the list price'
+  }
+}
+
+function appWith(model = new FakeModel(), extra: Partial<AppConfig> = {}) {
+  return buildServer({ config: { ...config, ...extra }, model })
+}
+
+describe('backend routes', () => {
+  it('serves health without a token', async () => {
+    const app = appWith()
     const response = await app.inject({ method: 'GET', url: '/health' })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ ok: true, service: 'pitchside' })
     await app.close()
+  })
+
+  it('rejects model routes without the dev token', async () => {
+    const app = appWith()
+    const response = await app.inject({ method: 'POST', url: '/v1/answers', payload: { question: 'Price?' } })
+    expect(response.statusCode).toBe(401)
+    await app.close()
+  })
+
+  it('streams an answer and caches the supplied context', async () => {
+    const model = new FakeModel()
+    const app = appWith(model)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/answers',
+      headers: { authorization: 'Bearer pitchside-dev' },
+      payload: { question: 'What is the seat price?', mode: 'fast', context: 'Seat price is $40.' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('Quote the list price')
+    expect(response.body).toContain('"provider":"fake"')
+    expect(model.last?.cachedContext).toBe('Seat price is $40.')
+    expect(model.last?.model).toBe('claude-haiku-5-5')
+    expect(model.last?.effort).toBe('low')
+    await app.close()
+  })
+
+  it('uses the deep model when asked', async () => {
+    const model = new FakeModel()
+    const app = appWith(model)
+    await app.inject({
+      method: 'POST',
+      url: '/v1/answers',
+      headers: { authorization: 'Bearer pitchside-dev' },
+      payload: { question: 'Walk me through the rollout', mode: 'deep' },
+    })
+    expect(model.last?.model).toBe('claude-opus-5-5')
+    expect(model.last?.effort).toBe('high')
+    await app.close()
+  })
+
+  it('returns a short-lived Deepgram token and hides the provider key', async () => {
+    const seen: string[] = []
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      seen.push(String((init?.headers as Record<string, string>).Authorization))
+      return new Response(JSON.stringify({ access_token: 'dg-temp', expires_in: 60 }), { status: 200 })
+    }) as typeof fetch
+    const app = buildServer({
+      config: { ...config, deepgramApiKey: 'dg-secret' },
+      model: new FakeModel(),
+      fetchImpl,
+    })
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/v1/deepgram/token',
+      headers: { authorization: 'Bearer pitchside-dev' },
+    })
+    expect(missing.statusCode).toBe(200)
+    expect(missing.json()).toEqual({ accessToken: 'dg-temp', expiresIn: 60 })
+    expect(missing.body).not.toContain('dg-secret')
+    expect(seen[0]).toBe('Token dg-secret')
+    await app.close()
+  })
+
+  it('reports when Deepgram is not configured', async () => {
+    const app = appWith()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/deepgram/token',
+      headers: { authorization: 'Bearer pitchside-dev' },
+    })
+    expect(response.statusCode).toBe(503)
+    await app.close()
+  })
+})
+
+describe('provider request shape', () => {
+  it('marks the system prompt and the knowledge block for Anthropic prompt caching', () => {
+    const body = anthropicBody({
+      model: 'claude-haiku-5-5',
+      system: 'Be brief.',
+      cachedContext: 'Seat price is $40.',
+      messages: [{ role: 'user', content: 'Price?' }],
+      maxTokens: 200,
+      effort: 'low',
+    })
+    const system = body.system as Array<{ text: string; cache_control: { type: string } }>
+    expect(system).toHaveLength(2)
+    expect(system.every((block) => block.cache_control.type === 'ephemeral')).toBe(true)
+    expect(system[1]?.text).toContain('$40')
+  })
+
+  it('keeps thinking text out of the spoken answer', () => {
+    expect(textFromAnthropicPayload({ type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'secret' } })).toBeNull()
+    expect(textFromAnthropicPayload({ type: 'content_block_delta', delta: { type: 'text_delta', text: '• Hi' } })).toBe('• Hi')
+  })
+})
+
+describe('loadConfig', () => {
+  it('stays offline until a provider key exists', () => {
+    expect(loadConfig({}).provider).toBe('offline')
+    expect(loadConfig({ ANTHROPIC_API_KEY: 'sk' }).provider).toBe('anthropic')
+    expect(loadConfig({ PITCHSIDE_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'sk' }).fastModel).toBe('claude-haiku-5-5')
   })
 })

@@ -1,8 +1,19 @@
 import type { BrowserWindowConstructorOptions } from 'electron'
+import type { HotkeyLabels } from '@pitchside/shared'
 
 export const HOTKEY_TOGGLE = 'CommandOrControl+Shift+Space'
 export const HOTKEY_CLICK_THROUGH = 'CommandOrControl+Shift+C'
 export const HOTKEY_ASK = 'CommandOrControl+Shift+A'
+export const HOTKEY_DEEP = 'CommandOrControl+Shift+D'
+
+export function hotkeyLabels(platform: NodeJS.Platform): HotkeyLabels {
+  return {
+    toggle: formatHotkey(HOTKEY_TOGGLE, platform),
+    clickThrough: formatHotkey(HOTKEY_CLICK_THROUGH, platform),
+    ask: formatHotkey(HOTKEY_ASK, platform),
+    deep: formatHotkey(HOTKEY_DEEP, platform),
+  }
+}
 
 export function formatHotkey(accelerator: string, platform: NodeJS.Platform): string {
   const mac = platform === 'darwin'

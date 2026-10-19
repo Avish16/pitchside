@@ -1,6 +1,6 @@
 import { app, BrowserWindow, globalShortcut } from 'electron'
-import { clickThroughEnabled, focusAsk, registerIpc, setClickThrough } from './ipc'
-import { HOTKEY_ASK, HOTKEY_CLICK_THROUGH, HOTKEY_TOGGLE } from './privacy'
+import { clickThroughEnabled, focusAsk, focusDeep, registerIpc, setClickThrough } from './ipc'
+import { HOTKEY_ASK, HOTKEY_CLICK_THROUGH, HOTKEY_DEEP, HOTKEY_TOGGLE } from './privacy'
 import { createTray } from './tray'
 import { createWindows, showOverlay } from './windows'
 
@@ -46,6 +46,9 @@ if (!gotLock) {
     globalShortcut.register(HOTKEY_CLICK_THROUGH, passThrough)
     globalShortcut.register(HOTKEY_ASK, () => {
       if (windows) focusAsk(windows)
+    })
+    globalShortcut.register(HOTKEY_DEEP, () => {
+      if (windows) focusDeep(windows)
     })
     app.on('will-quit', () => globalShortcut.unregisterAll())
 

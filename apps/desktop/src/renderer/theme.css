@@ -27,6 +27,7 @@ html, body, #root {
 
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
+textarea { resize: vertical; }
 
 .word {
   font-family: Georgia, "Iowan Old Style", Palatino, serif;
@@ -74,3 +75,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 
 .pill.up { color: var(--good); }
 .pill.down { color: var(--bad); }
+
+.answer-card { margin-top: 14px; display: grid; gap: 8px; }
+.answer-question { margin: 0; color: var(--paper); }
+.answer-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.answer-scroll { flex: 1; overflow: auto; min-height: 0; }
+.warn { color: var(--signal); }

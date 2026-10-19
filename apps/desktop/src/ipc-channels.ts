@@ -9,4 +9,9 @@ export const Ipc = {
   quit: 'app:quit',
   snapshot: 'snapshot',
   askFocus: 'ask:focus',
+  deepAsk: 'ask:deep',
+  answer: 'answer',
+  getSettings: 'settings:get',
+  saveSettings: 'settings:save',
+  ask: 'answers:ask',
 } as const

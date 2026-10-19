@@ -1,12 +1,20 @@
-import { ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
-import type { SharePreview, Snapshot } from '@pitchside/shared'
+import { app, ipcMain, desktopCapturer, type BrowserWindow } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
+import type { AnswerEvent, AskRequest, DesktopSettings, SharePreview, Snapshot } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
-import { readBackendHealth } from './health'
-import { HOTKEY_ASK, HOTKEY_CLICK_THROUGH, HOTKEY_TOGGLE, formatHotkey } from './privacy'
+import { streamBackendAnswer } from './answers'
+import { BACKEND_URL, readBackendHealth } from './health'
+import { hotkeyLabels } from './privacy'
+import { readLocalSettings, writeLocalSettings } from './settings'
 import { showOverlay, type DesktopWindows } from './windows'
 
 let clickThrough = false
 let afterClickThrough: () => void = () => undefined
+
+export function settingsPath(): string {
+  return join(app.getPath('userData'), 'settings.json')
+}
 
 export function clickThroughEnabled(): boolean {
   return clickThrough
@@ -43,9 +51,17 @@ export function registerIpc(
   windows: DesktopWindows,
   quit: () => void,
 ): { publish: () => Promise<void> } {
+  const targets = (): BrowserWindow[] => [windows.overlay, windows.panel]
+
   const broadcast = (snapshot: Snapshot): void => {
-    for (const window of [windows.overlay, windows.panel]) {
+    for (const window of targets()) {
       if (!window.isDestroyed()) window.webContents.send(Ipc.snapshot, snapshot)
+    }
+  }
+
+  const broadcastAnswer = (event: AnswerEvent): void => {
+    for (const window of targets()) {
+      if (!window.isDestroyed()) window.webContents.send(Ipc.answer, event)
     }
   }
 
@@ -54,11 +70,7 @@ export function registerIpc(
     overlayVisible: windows.overlay.isVisible(),
     clickThrough,
     platform: process.platform,
-    hotkeys: {
-      toggle: formatHotkey(HOTKEY_TOGGLE, process.platform),
-      clickThrough: formatHotkey(HOTKEY_CLICK_THROUGH, process.platform),
-      ask: formatHotkey(HOTKEY_ASK, process.platform),
-    },
+    hotkeys: hotkeyLabels(process.platform),
   })
 
   const publish = async (): Promise<void> => {
@@ -67,6 +79,11 @@ export function registerIpc(
   afterClickThrough = () => {
     void publish()
   }
+
+  const currentSettings = (): DesktopSettings => ({
+    ...readLocalSettings(settingsPath()),
+    backendUrl: BACKEND_URL,
+  })
 
   ipcMain.handle(Ipc.getSnapshot, () => snapshot())
   ipcMain.handle(Ipc.refreshHealth, () => snapshot())
@@ -89,8 +106,40 @@ export function registerIpc(
   })
   ipcMain.handle(Ipc.testShare, () => sharePreview())
   ipcMain.handle(Ipc.quit, () => quit())
+  ipcMain.handle(Ipc.getSettings, () => currentSettings())
+  ipcMain.handle(Ipc.saveSettings, (_event, input: { devToken?: string }) => {
+    const devToken = typeof input?.devToken === 'string' ? input.devToken : ''
+    writeLocalSettings(settingsPath(), { devToken })
+    return currentSettings()
+  })
+  ipcMain.handle(Ipc.ask, (event, input: AskRequest) => {
+    const question = input?.question?.trim() ?? ''
+    const mode = input?.mode === 'deep' ? 'deep' : 'fast'
+    if (!question) return { ok: false as const, error: 'Type a question first.' }
+    const id = randomUUID()
+    const settings = currentSettings()
+    broadcastAnswer({ type: 'start', id, question, mode })
+    void streamBackendAnswer({
+      backendUrl: settings.backendUrl,
+      devToken: settings.devToken,
+      body: {
+        question,
+        mode,
+        context: input.context,
+        transcript: input.transcript,
+      },
+      onDelta: (text) => broadcastAnswer({ type: 'delta', id, text }),
+    })
+      .then((result) => broadcastAnswer({ type: 'done', id, provider: result.provider }))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'The answer failed'
+        broadcastAnswer({ type: 'error', id, message })
+      })
+    void event
+    return { ok: true as const, id }
+  })
 
-  for (const window of [windows.overlay, windows.panel]) {
+  for (const window of targets()) {
     window.on('show', () => void publish())
     window.on('hide', () => void publish())
   }
@@ -102,4 +151,10 @@ export function focusAsk(windows: DesktopWindows): void {
   windows.panel.show()
   windows.panel.focus()
   windows.panel.webContents.send(Ipc.askFocus)
+}
+
+export function focusDeep(windows: DesktopWindows): void {
+  windows.panel.show()
+  windows.panel.focus()
+  windows.panel.webContents.send(Ipc.deepAsk)
 }

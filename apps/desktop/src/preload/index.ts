@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { PitchsideBridge, SharePreview, Snapshot } from '@pitchside/shared'
+import type { AnswerEvent, AskRequest, DesktopSettings, PitchsideBridge, SharePreview, Snapshot } from '@pitchside/shared'
 import { Ipc } from '../ipc-channels'
 
 const api: PitchsideBridge = {
@@ -11,6 +11,9 @@ const api: PitchsideBridge = {
   toggleClickThrough: () => ipcRenderer.invoke(Ipc.toggleClickThrough),
   testShare: () => ipcRenderer.invoke(Ipc.testShare) as Promise<SharePreview>,
   quit: () => ipcRenderer.invoke(Ipc.quit),
+  getSettings: () => ipcRenderer.invoke(Ipc.getSettings) as Promise<DesktopSettings>,
+  saveSettings: (input) => ipcRenderer.invoke(Ipc.saveSettings, input) as Promise<DesktopSettings>,
+  ask: (input: AskRequest) => ipcRenderer.invoke(Ipc.ask, input),
   onSnapshot: (listener) => {
     const wrapped = (_event: IpcRendererEvent, snapshot: Snapshot): void => listener(snapshot)
     ipcRenderer.on(Ipc.snapshot, wrapped)
@@ -20,6 +23,16 @@ const api: PitchsideBridge = {
     const wrapped = (): void => listener()
     ipcRenderer.on(Ipc.askFocus, wrapped)
     return () => ipcRenderer.removeListener(Ipc.askFocus, wrapped)
+  },
+  onDeepAsk: (listener) => {
+    const wrapped = (): void => listener()
+    ipcRenderer.on(Ipc.deepAsk, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.deepAsk, wrapped)
+  },
+  onAnswer: (listener) => {
+    const wrapped = (_event: IpcRendererEvent, payload: AnswerEvent): void => listener(payload)
+    ipcRenderer.on(Ipc.answer, wrapped)
+    return () => ipcRenderer.removeListener(Ipc.answer, wrapped)
   },
 }
 

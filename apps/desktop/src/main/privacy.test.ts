@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   HOTKEY_ASK,
   HOTKEY_CLICK_THROUGH,
+  HOTKEY_DEEP,
   HOTKEY_TOGGLE,
   applyCaptureExclusion,
   formatHotkey,
+  hotkeyLabels,
   overlayWindowOptions,
   type PrivacyWindow,
 } from './privacy'
@@ -39,5 +41,7 @@ describe('overlay privacy', () => {
     expect(formatHotkey(HOTKEY_TOGGLE, 'darwin')).toBe('⌘⇧Space')
     expect(formatHotkey(HOTKEY_CLICK_THROUGH, 'win32')).toBe('Ctrl+Shift+C')
     expect(formatHotkey(HOTKEY_ASK, 'linux')).toBe('Ctrl+Shift+A')
+    expect(formatHotkey(HOTKEY_DEEP, 'darwin')).toBe('⌘⇧D')
+    expect(hotkeyLabels('linux').deep).toBe('Ctrl+Shift+D')
   })
 })
