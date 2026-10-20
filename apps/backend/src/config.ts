@@ -21,12 +21,16 @@ export function loadEnvFile(filePath: string, env: NodeJS.ProcessEnv = process.e
   }
 }
 
-export type ModelProviderName = 'anthropic' | 'openrouter' | 'offline'
+export type ModelProviderName = 'xai' | 'anthropic' | 'openrouter' | 'offline'
+
+export const XAI_FAST_MODEL = 'grok-4.3'
+export const XAI_DEEP_MODEL = 'grok-4.7'
 
 export interface AppConfig {
   devToken: string
   port: number
   provider: ModelProviderName
+  xaiApiKey: string
   anthropicApiKey: string
   openrouterApiKey: string
   deepgramApiKey: string
@@ -36,25 +40,40 @@ export interface AppConfig {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const xaiApiKey = env.XAI_API_KEY?.trim() ?? ''
   const anthropicApiKey = env.ANTHROPIC_API_KEY?.trim() ?? ''
   const openrouterApiKey = env.OPENROUTER_API_KEY?.trim() ?? ''
-  const requested = env.PITCHSIDE_PROVIDER?.trim()
-  let provider: ModelProviderName = 'offline'
-  if (requested === 'openrouter' && openrouterApiKey) provider = 'openrouter'
-  else if (requested === 'anthropic' && anthropicApiKey) provider = 'anthropic'
-  else if (requested === 'offline') provider = 'offline'
-  else if (anthropicApiKey) provider = 'anthropic'
-  else if (openrouterApiKey) provider = 'openrouter'
+  const requested = (env.LLM_PROVIDER ?? env.PITCHSIDE_PROVIDER)?.trim().toLowerCase()
+  const provider = selectProvider(requested, { xaiApiKey, anthropicApiKey, openrouterApiKey })
+  const defaults =
+    provider === 'xai'
+      ? { fast: XAI_FAST_MODEL, deep: XAI_DEEP_MODEL, triage: XAI_FAST_MODEL }
+      : { fast: 'claude-haiku-5-5', deep: 'claude-opus-5-5', triage: 'claude-haiku-5-5' }
 
   return {
     devToken: env.PITCHSIDE_DEV_TOKEN?.trim() || 'pitchside-dev',
     port: Number(env.PORT ?? 43124),
     provider,
+    xaiApiKey,
     anthropicApiKey,
     openrouterApiKey,
     deepgramApiKey: env.DEEPGRAM_API_KEY?.trim() ?? '',
-    fastModel: env.PITCHSIDE_FAST_MODEL?.trim() || 'claude-haiku-5-5',
-    deepModel: env.PITCHSIDE_DEEP_MODEL?.trim() || 'claude-opus-5-5',
-    triageModel: env.PITCHSIDE_TRIAGE_MODEL?.trim() || 'claude-haiku-5-5',
+    fastModel: env.PITCHSIDE_FAST_MODEL?.trim() || defaults.fast,
+    deepModel: env.PITCHSIDE_DEEP_MODEL?.trim() || defaults.deep,
+    triageModel: env.PITCHSIDE_TRIAGE_MODEL?.trim() || defaults.triage,
   }
+}
+
+function selectProvider(
+  requested: string | undefined,
+  keys: { xaiApiKey: string; anthropicApiKey: string; openrouterApiKey: string },
+): ModelProviderName {
+  if (requested === 'offline') return 'offline'
+  if (requested === 'xai') return keys.xaiApiKey ? 'xai' : 'offline'
+  if (requested === 'anthropic') return keys.anthropicApiKey ? 'anthropic' : 'offline'
+  if (requested === 'openrouter') return keys.openrouterApiKey ? 'openrouter' : 'offline'
+  if (keys.xaiApiKey) return 'xai'
+  if (keys.anthropicApiKey) return 'anthropic'
+  if (keys.openrouterApiKey) return 'openrouter'
+  return 'offline'
 }

@@ -9,6 +9,7 @@ const config: AppConfig = {
   devToken: 'pitchside-dev',
   port: 0,
   provider: 'offline',
+  xaiApiKey: '',
   anthropicApiKey: '',
   openrouterApiKey: '',
   deepgramApiKey: '',
@@ -194,6 +195,17 @@ describe('loadConfig', () => {
   it('stays offline until a provider key exists', () => {
     expect(loadConfig({}).provider).toBe('offline')
     expect(loadConfig({ ANTHROPIC_API_KEY: 'sk' }).provider).toBe('anthropic')
+    expect(loadConfig({ LLM_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'sk' }).provider).toBe('anthropic')
     expect(loadConfig({ PITCHSIDE_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'sk' }).fastModel).toBe('claude-haiku-5-5')
+  })
+
+  it('selects xAI from LLM_PROVIDER and defaults to the public Grok ids', () => {
+    const config = loadConfig({ LLM_PROVIDER: 'xai', XAI_API_KEY: 'xai-secret' })
+    expect(config.provider).toBe('xai')
+    expect(config.fastModel).toBe('grok-4.3')
+    expect(config.triageModel).toBe('grok-4.3')
+    expect(config.deepModel).toBe('grok-4.7')
+    expect(loadConfig({ LLM_PROVIDER: 'xai' }).provider).toBe('offline')
+    expect(loadConfig({ XAI_API_KEY: 'xai-secret', PITCHSIDE_FAST_MODEL: 'grok-4.3' }).provider).toBe('xai')
   })
 })

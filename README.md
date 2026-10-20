@@ -18,24 +18,36 @@ Provider keys live only in `apps/backend/.env`. The desktop stores a dev access 
 
 Node 22.12 or newer and pnpm 10.
 
+On Windows, in PowerShell:
+
+```powershell
+npm i -g pnpm
+pnpm install
+Copy-Item apps\backend\.env.example apps\backend\.env
+```
+
+On macOS or Linux:
+
 ```bash
 pnpm install
 cp apps/backend/.env.example apps/backend/.env
 ```
 
-Fill in the backend env if you want live models and transcription. With the keys empty, `pnpm dev` still runs. Answers are labeled `[offline demo]`, and listening falls back to practice lines.
+Put `XAI_API_KEY` in `apps/backend/.env`. `LLM_PROVIDER` is already `xai`. With the key empty, `pnpm dev` still runs. Answers are labeled `[offline demo]`, and listening falls back to practice lines.
 
 | Variable | Role |
 | --- | --- |
 | `PITCHSIDE_DEV_TOKEN` | Shared token the desktop sends. Default `pitchside-dev`. |
-| `ANTHROPIC_API_KEY` | Default provider. |
-| `OPENROUTER_API_KEY` | Used when `PITCHSIDE_PROVIDER=openrouter`. |
+| `LLM_PROVIDER` | `xai` (default), `anthropic`, or `openrouter`. Wins over `PITCHSIDE_PROVIDER`. |
+| `XAI_API_KEY` | xAI key. The client calls `https://api.x.ai/v1`. |
+| `ANTHROPIC_API_KEY` | Used when `LLM_PROVIDER=anthropic`. |
+| `OPENROUTER_API_KEY` | Used when `LLM_PROVIDER=openrouter`. |
 | `DEEPGRAM_API_KEY` | Minted into a one-minute token. The desktop connects to Deepgram itself. |
-| `PITCHSIDE_FAST_MODEL` | Live answers and triage. Default `claude-haiku-5-5`. |
-| `PITCHSIDE_DEEP_MODEL` | Deep-answer hotkey and post-call draft. Default `claude-opus-5-5`. |
-| `PITCHSIDE_TRIAGE_MODEL` | Used only when a line is ambiguous. |
+| `PITCHSIDE_FAST_MODEL` | Live answers. Default `grok-4.3` on xAI, `claude-haiku-5-5` otherwise. |
+| `PITCHSIDE_TRIAGE_MODEL` | Ambiguous-line fallback. Default `grok-4.3` on xAI. |
+| `PITCHSIDE_DEEP_MODEL` | Deep answer and post-call draft. Default `grok-4.7` on xAI, `claude-opus-5-5` otherwise. |
 
-The fast and deep ids are config. Anthropic requests cache the system prompt and the knowledge block, and the desktop warms that prefix when notes change.
+Those model ids are config. Anthropic still marks the system prompt and the knowledge block with `cache_control`. xAI does not: the same text is sent in the system message, and a `prompt_cache_key` is set so repeated prefixes can stick to one server. OpenRouter receives the text with no cache marker. The desktop still warms the prefix when notes change.
 
 ## Run
 
@@ -101,7 +113,7 @@ Verified here with `pnpm test`, `pnpm typecheck`, and `pnpm build` on Linux. The
 - **macOS system audio.** ScreenCaptureKit loopback needs a Mac. There is no Swift capture addon in this repo. Electron's `audio: 'loopback'` handler is the macOS path, and it was not exercised here.
 - **Windows loopback.** The same handler is WASAPI on Windows. It is implemented and untested on Windows.
 - **Capture exclusion.** Linux does not honor `setContentProtection`. A Zoom or OBS check on Windows or macOS is still required. The in-app preview may still show the overlay on Linux, and the preview says so.
-- **A live Deepgram socket and a live Anthropic or OpenRouter stream.** Those need keys in `apps/backend/.env`. The offline demo and the unit tests cover the client, the token grant shape, and the SSE parser.
+- **A live Deepgram socket and a live xAI, Anthropic, or OpenRouter stream.** Those need keys in `apps/backend/.env`. The offline demo and the unit tests cover the client, the token grant shape, and the SSE parser.
 - **Global hotkeys, the tray, and a real microphone** depend on a desktop session. This environment has no session bus, so the tray can fail to register. The windows still open. A missing microphone leaves practice lines working.
 - **English heuristics** for triage and question detection. Other languages fall through to "other" or the model fallback.
 - **Hashed local embeddings**, not a hosted embedding model. They are good enough to pick a nearby note or slide. They are not a search engine.
