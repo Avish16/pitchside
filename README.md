@@ -21,7 +21,7 @@ Node 22.12 or newer and pnpm 10.
 On Windows, in PowerShell:
 
 ```powershell
-npm i -g pnpm
+npm i -g pnpm@10.33.4
 pnpm install
 Copy-Item apps\backend\.env.example apps\backend\.env
 ```
@@ -33,7 +33,20 @@ pnpm install
 cp apps/backend/.env.example apps/backend/.env
 ```
 
+The root `package.json` pins `packageManager` to `pnpm@10.33.4`. Install that version. pnpm 10 does not run dependency build scripts unless the package is named in `pnpm.onlyBuiltDependencies`. This repo allows `electron`, `esbuild`, and `electron-winstaller`.
+
 Put `XAI_API_KEY` in `apps/backend/.env`. `LLM_PROVIDER` is already `xai`. With the key empty, `pnpm dev` still runs. Answers are labeled `[offline demo]`, and listening falls back to practice lines.
+
+### `Error: Electron uninstall`
+
+electron-vite throws this when `node_modules/electron/path.txt` is missing. pnpm 10 will skip a dependency postinstall that is not in `onlyBuiltDependencies`, but Electron 44 does not ship one: the binary is no longer downloaded by Electron's own install script. `pnpm install` runs `node node_modules/electron/install.js` from the root package so a fresh install still fetches it.
+
+If `pnpm dev` still reports `Electron uninstall`, approve any blocked build scripts and download the binary:
+
+```powershell
+pnpm approve-builds
+node node_modules/electron/install.js
+```
 
 | Variable | Role |
 | --- | --- |
